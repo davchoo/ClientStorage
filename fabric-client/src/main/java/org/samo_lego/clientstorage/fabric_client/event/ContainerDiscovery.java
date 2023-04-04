@@ -87,7 +87,7 @@ public class ContainerDiscovery {
                             if (blockEntity instanceof InteractableContainer && player.getEyePosition().distanceTo(Vec3.atCenterOf(position)) < config.maxDist) {
                                 // Check if container can be opened
                                 // (avoid sending packets to those that client knows they can't be opened)
-                                if (!ContainerUtil.canOpenContainer(blockEntity, player)) {
+                                if (!ContainerUtil.shouldIncludeContainer(blockEntity, player)) {
                                     return;
                                 }
                                 scanContainer(ContainerUtil.getContainer(blockEntity));
