@@ -5,9 +5,10 @@ import com.mojang.blaze3d.pipeline.TextureTarget;
 import com.mojang.blaze3d.platform.GlStateManager;
 import com.mojang.blaze3d.platform.Window;
 import com.mojang.blaze3d.systems.RenderSystem;
-import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.*;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiComponent;
+import net.minecraft.client.renderer.GameRenderer;
+import org.joml.Matrix4f;
 import org.lwjgl.opengl.GL30;
 
 /**
@@ -39,27 +40,24 @@ public class TransparencyBuffer {
         RenderSystem.setShaderColor(1.0f, 1.0f, 1.0f, 0.5f);
     }
 
-    public static void drawExtraFramebuffer(PoseStack matrices) {
+    public static void drawExtraFramebuffer(PoseStack poseStack) {
         // Restore the original framebuffer
         GlStateManager._glBindFramebuffer(GL30.GL_FRAMEBUFFER, previousFramebuffer);
 
         // Render the custom framebuffer's contents with transparency into the main buffer
         RenderSystem.setShaderTexture(0, framebuffer.getColorTextureId());
         Window window = Minecraft.getInstance().getWindow();
-        // Create new matrix stack to prevent the transparency from affecting the rest of the GUI
-        GuiComponent.blit(
-                matrices,
-                0,                            // x
-                0,                            // y
-                window.getGuiScaledWidth(),   // width
-                window.getGuiScaledHeight(),  // height
-                0,                            // left-most coordinate of the texture region
-                framebuffer.height,           // top-most coordinate of the texture region
-                framebuffer.width,            // width of the texture region
-                -framebuffer.height,          // height of the texture region
-                framebuffer.width,            // width of the entire texture
-                framebuffer.height            // height of the entire texture
-        );
+        int k = window.getGuiScaledWidth();
+        int l = window.getGuiScaledHeight();
+        RenderSystem.setShader(GameRenderer::getPositionTexShader);
+        Matrix4f matrix4f = poseStack.last().pose();
+        BufferBuilder bufferBuilder = Tesselator.getInstance().getBuilder();
+        bufferBuilder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_TEX);
+        bufferBuilder.vertex(matrix4f, (float) 0, (float)k, (float) 0).uv((float) 0, (float) 1).endVertex();
+        bufferBuilder.vertex(matrix4f, (float) 0, (float)l, (float) 0).uv((float) 0, (float) 0).endVertex();
+        bufferBuilder.vertex(matrix4f, (float) 0, (float)l, (float) 0).uv((float) 1, (float) 0).endVertex();
+        bufferBuilder.vertex(matrix4f, (float) 0, (float)k, (float) 0).uv((float) 1, (float) 1).endVertex();
+        BufferUploader.drawWithShader(bufferBuilder.end());
     }
 
     public static void postInject() {

@@ -5,11 +5,13 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import it.unimi.dsi.fastutil.ints.Int2ObjectArrayMap;
 import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.AbstractContainerMenu;
@@ -93,24 +95,24 @@ public abstract class MAbstractContainerScreen extends Screen {
     /**
      * Just there to save current rendered slot
      *
-     * @param poseStack
+     * @param guiGraphics
      * @param slot
      * @param ci
      */
     @Inject(method = "renderSlot", at = @At("HEAD"))
-    private void saveSlot(PoseStack poseStack, Slot slot, CallbackInfo ci) {
+    private void saveSlot(GuiGraphics guiGraphics, Slot slot, CallbackInfo ci) {
         this.activeSlot = slot;
     }
 
     @Inject(method = "renderSlotHighlight",
             at = @At(value = "INVOKE",
-                    target = "Lnet/minecraft/client/gui/screens/inventory/AbstractContainerScreen;fillGradient(Lcom/mojang/blaze3d/vertex/PoseStack;IIIIIII)V"),
+                    target = "Lnet/minecraft/client/gui/GuiGraphics;fillGradient(Lnet/minecraft/client/renderer/RenderType;IIIIIII)V"),
             cancellable = true)
-    private static void renderSlotHighlight(PoseStack poseStack, int x, int y, int blitOffset, CallbackInfo ci) {
+    private static void renderSlotHighlight(GuiGraphics guiGraphics, int x, int y, int blitOffset, CallbackInfo ci) {
         if (usingFakeSlot) {
             final int color = 0x7F_FF_F7_00;
 
-            AbstractContainerScreen.fillGradient(poseStack, x, y, x + 16, y + 16, color, color, blitOffset);
+            guiGraphics.fillGradient(RenderType.guiOverlay(), x, y, x + 16, y + 16, color, color, blitOffset);
             RenderSystem.colorMask(true, true, true, true);
             RenderSystem.enableDepthTest();
 
@@ -123,16 +125,17 @@ public abstract class MAbstractContainerScreen extends Screen {
      * It renders the item to a framebuffer and then
      * draws framebuffer texture over the slot with transparency.
      *
-     * @param poseStack matrix stack
-     * @param slot      slot being rendered
-     * @param ci
+     * @param guiGraphics GuiGraphics
+     * @param slot        slot being rendered
+     * @param ci          Callback info
      */
     @Inject(method = "renderSlot", at = @At("TAIL"))
-    private void postRenderItem(PoseStack poseStack, Slot slot, CallbackInfo ci) {
+    private void postRenderItem(GuiGraphics guiGraphics, Slot slot, CallbackInfo ci) {
         if (this.fakeSlot == slot.index) {
             TransparencyBuffer.preInject();
 
             // Align the matrix stack
+            PoseStack poseStack = guiGraphics.pose();
             poseStack.pushPose();
             poseStack.translate(-this.leftPos, -this.topPos, 0.0f);
 

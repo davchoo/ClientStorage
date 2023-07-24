@@ -27,7 +27,7 @@ dependencies {
 	modCompileOnly("com.terraformersmc:modmenu:${project.modmenu_version}")
 
 	// YACL (for configuring the mod in-game)
-	modImplementation(include("dev.isxander:yet-another-config-lib:${project.yacl_version}"))
+	modImplementation("dev.isxander.yacl:yet-another-config-lib-fabric:${project.yacl_version}")
 }
 
 
@@ -52,5 +52,12 @@ modrinth {
 	dependencies { // A special DSL for creating dependencies
 		required.project "fabric-api" // Creates a new required dependency on Fabric API
 		required.project "yacl"
+	}
+}
+
+afterEvaluate {
+	loom.runs.configureEach {
+		// https://fabricmc.net/wiki/tutorial:mixin_hotswaps
+		vmArg "-javaagent:${ configurations.compileClasspath.find { it.name.contains("sponge-mixin") } }"
 	}
 }
