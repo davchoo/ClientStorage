@@ -93,6 +93,7 @@ public interface IRemoteStack {
      * @see org.samo_lego.clientstorage.fabric_client.util.StorageCache#FREE_SPACE_CONTAINERS
      */
     default void cs_transfer2Remote(boolean carried, int freeSlot) {
+        // TODO allow partial stacking
         var player = Minecraft.getInstance().player;
 
         Optional<Map.Entry<InteractableContainer, Integer>> containerCandidate = FREE_SPACE_CONTAINERS.entrySet().stream().findAny();
@@ -123,7 +124,7 @@ public interface IRemoteStack {
         Map.Entry<InteractableContainer, Integer> emptyContainer = containerCandidate.get();
 
         // Check left space
-        int spaceLeft = emptyContainer.getValue() - stack.getCount();
+        int spaceLeft = emptyContainer.getValue() - 1; // Number of slots left
         if (spaceLeft <= 0) {
             FREE_SPACE_CONTAINERS.remove(emptyContainer.getKey());
         } else {

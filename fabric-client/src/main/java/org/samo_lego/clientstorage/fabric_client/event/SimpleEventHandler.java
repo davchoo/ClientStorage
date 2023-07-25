@@ -130,6 +130,11 @@ public class SimpleEventHandler {
         Optional<InteractableContainer> container = ((ICSPlayer) player).cs_getLastInteractedContainer();
 
         container.ifPresent(inv -> {
+            if (player.containerMenu instanceof CraftingMenu) {
+                // Don't cache the fake items from ClientStorage
+                return;
+            }
+
             ClientStorageFabric.tryLog("Saving inventory to cache for " + inv.cs_info(), ChatFormatting.AQUA);
             final NonNullList<ItemStack> items = player.containerMenu.getItems();
 
