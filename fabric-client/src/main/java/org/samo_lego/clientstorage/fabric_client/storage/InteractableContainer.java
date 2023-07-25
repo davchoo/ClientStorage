@@ -85,10 +85,10 @@ public interface InteractableContainer extends Container {
      */
     default String cs_info() {
         // Get position
-        final String position = String.format("(%d, %d, %d)",
-                (int) this.cs_position().x(),
-                (int) this.cs_position().y(),
-                (int) this.cs_position().z());
+        final String position = String.format("(%.2f, %.2f, %.2f)",
+                this.cs_position().x(),
+                this.cs_position().y(),
+                this.cs_position().z());
         return String.format("%s @ %s [%d slots]", this.cs_getName().getString(), position, this.getContainerSize());
     }
 }

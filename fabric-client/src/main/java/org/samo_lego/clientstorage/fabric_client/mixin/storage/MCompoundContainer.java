@@ -35,6 +35,11 @@ public abstract class MCompoundContainer implements InteractableContainerBlock {
     }
 
     @Override
+    public BlockPos cs_blockPos() {
+        return this.pos;
+    }
+
+    @Override
     public Vec3 cs_position() {
         return this.pos.getCenter();
     }

@@ -3,7 +3,6 @@ package org.samo_lego.clientstorage.fabric_client.event;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
 import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
@@ -30,6 +29,7 @@ import org.samo_lego.clientstorage.fabric_client.mixin.accessor.ACompoundContain
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.AMultiPlayerGamemode;
 import org.samo_lego.clientstorage.fabric_client.render.ESPRender;
 import org.samo_lego.clientstorage.fabric_client.storage.InteractableContainer;
+import org.samo_lego.clientstorage.fabric_client.storage.InteractableContainerBlock;
 import org.samo_lego.clientstorage.fabric_client.util.ContainerUtil;
 import org.samo_lego.clientstorage.fabric_client.util.PlayerLookUtil;
 import org.samo_lego.clientstorage.fabric_client.util.StorageCache;
@@ -235,16 +235,24 @@ public class ContainerDiscovery {
         while (!INTERACTION_Q.isEmpty()) {
             try {
                 InteractableContainer container = INTERACTION_Q.poll();
-                ClientStorageFabric.tryLog("Sending packets :: " + container.cs_info(), ChatFormatting.AQUA);
-
-                var hitResult = PlayerLookUtil.raycastTo(container.cs_position());
-                boolean behindWall = hitResult.getBlockPos().getCenter().distanceTo(container.cs_position()) > 1;
-
-                if (!config.lookThroughBlocks() && behindWall) {
-                    // This container is behind a block, so we can't open it
-                    continue;
+                if (!config.lookThroughBlocks()) {
+                    // Check if the container is behind a block
+                    var hitResult = PlayerLookUtil.raycastTo(container.cs_position());
+                    boolean behindBlock;
+                    if (container instanceof InteractableContainerBlock blockContainer) {
+                        behindBlock = !hitResult.getBlockPos().equals(blockContainer.cs_blockPos());
+                        // TODO handle compound containers better
+                    } else {
+                        // TODO raycast for entities?
+                        behindBlock = hitResult.getBlockPos().getCenter().distanceTo(container.cs_position()) > 1;
+                    }
+                    if (behindBlock) {
+                        ClientStorageFabric.tryLog("Container is blocked :: " + container.cs_info(), ChatFormatting.DARK_RED);
+                        continue;
+                    }
                 }
 
+                ClientStorageFabric.tryLog("Sending packets :: " + container.cs_info(), ChatFormatting.AQUA);
                 if (container.cs_isDelayed() && count++ >= FabricConfig.limiter.getThreshold()) {
                     count = 0;
                     try {

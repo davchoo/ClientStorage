@@ -2,8 +2,10 @@ package org.samo_lego.clientstorage.fabric_client.storage;
 
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.phys.BlockHitResult;
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.AMultiPlayerGamemode;
 import org.samo_lego.clientstorage.fabric_client.render.ESPRender;
 import org.samo_lego.clientstorage.fabric_client.util.PlayerLookUtil;
@@ -12,13 +14,22 @@ import org.samo_lego.clientstorage.fabric_client.util.PlayerLookUtil;
  * Implementation of {@link InteractableContainer}, used for containers that are blocks.
  */
 public interface InteractableContainerBlock extends InteractableContainer {
+
+    BlockPos cs_blockPos();
+
     @Override
     default void cs_sendInteractionPacket() {
         InteractableContainer.super.cs_sendInteractionPacket();
         var gm = (AMultiPlayerGamemode) Minecraft.getInstance().gameMode;
-        final var hitResult = PlayerLookUtil.raycastTo(this.cs_position());
+        var hitResult = PlayerLookUtil.raycastTo(this.cs_position());
+        if (!hitResult.getBlockPos().equals(cs_blockPos())) {
+            // Force hit result to have the correct block position
+            hitResult = new BlockHitResult(this.cs_position(), Direction.NORTH, cs_blockPos(), true);
+        }
+
+        BlockHitResult finalHitResult = hitResult;
         gm.cs_startPrediction(Minecraft.getInstance().level, i ->
-                new ServerboundUseItemOnPacket(InteractionHand.MAIN_HAND, hitResult, i));
+                new ServerboundUseItemOnPacket(InteractionHand.MAIN_HAND, finalHitResult, i));
 
     }
 
@@ -29,6 +40,15 @@ public interface InteractableContainerBlock extends InteractableContainer {
 
     @Override
     default void cs_markGlowing() {
-        ESPRender.markBlock(BlockPos.containing(this.cs_position()));
+        ESPRender.markBlock(cs_blockPos());
+    }
+
+    @Override
+    default String cs_info() {
+        final String position = String.format("(%d, %d, %d)",
+                this.cs_blockPos().getX(),
+                this.cs_blockPos().getY(),
+                this.cs_blockPos().getZ());
+        return String.format("%s @ %s [%d slots]", this.cs_getName().getString(), position, this.getContainerSize());
     }
 }
