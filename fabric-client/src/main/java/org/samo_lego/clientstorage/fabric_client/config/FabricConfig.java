@@ -10,7 +10,7 @@ import org.jetbrains.annotations.Nullable;
 import org.samo_lego.clientstorage.common.Config;
 import org.samo_lego.clientstorage.fabric_client.config.storage_memory.StorageMemoryConfig;
 import org.samo_lego.clientstorage.fabric_client.inventory.ItemBehaviour;
-import org.samo_lego.clientstorage.fabric_client.network.PacketLimiter;
+import org.samo_lego.clientstorage.fabric_client.network.PacketLimits;
 
 import static net.minecraft.server.network.ServerGamePacketListenerImpl.MAX_INTERACTION_DISTANCE;
 import static org.samo_lego.clientstorage.fabric_client.ClientStorageFabric.SERVER_CONFIG_CHANNEL;
@@ -18,7 +18,7 @@ import static org.samo_lego.clientstorage.fabric_client.ClientStorageFabric.conf
 
 public class FabricConfig extends Config {
 
-    public static PacketLimiter limiter = PacketLimiter.VANILLA;
+    public static PacketLimits limiter = PacketLimits.VANILLA;
     public StorageMemoryConfig storageMemory;
 
     public double maxDist;
@@ -61,14 +61,14 @@ public class FabricConfig extends Config {
 
     @Override
     public void onLoad() {
-        PacketLimiter.CUSTOM.setDelay(this.customLimiter.delay);
-        PacketLimiter.CUSTOM.setThreshold(this.customLimiter.threshold);
+        PacketLimits.CUSTOM.setDelay(this.customLimiter.delay);
+        PacketLimits.CUSTOM.setThreshold(this.customLimiter.threshold);
     }
 
     @Override
     public void save() {
-        this.customLimiter.delay = PacketLimiter.CUSTOM.getDelay();
-        this.customLimiter.threshold = PacketLimiter.CUSTOM.getThreshold();
+        this.customLimiter.delay = PacketLimits.CUSTOM.getDelay();
+        this.customLimiter.threshold = PacketLimits.CUSTOM.getThreshold();
 
         super.save();
     }

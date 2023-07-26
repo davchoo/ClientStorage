@@ -10,7 +10,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import org.jetbrains.annotations.Nullable;
 import org.samo_lego.clientstorage.fabric_client.inventory.ItemBehaviour;
-import org.samo_lego.clientstorage.fabric_client.network.PacketLimiter;
+import org.samo_lego.clientstorage.fabric_client.network.PacketLimits;
 import org.samo_lego.clientstorage.fabric_client.render.ESPRender;
 
 import static org.samo_lego.clientstorage.fabric_client.ClientStorageFabric.config;
@@ -188,7 +188,7 @@ public class ConfigScreen {
         final var customDelayOption = Option.<Integer>createBuilder()
                 .name(Component.translatable("settings.clientstorage.custom_delay"))
                 .description(OptionDescription.of(Component.translatable("tooltip.clientstorage.custom_delay")))
-                .binding(300, PacketLimiter.CUSTOM::getDelay, PacketLimiter.CUSTOM::setDelay)
+                .binding(300, PacketLimits.CUSTOM::getDelay, PacketLimits.CUSTOM::setDelay)
                 .controller(opt -> IntegerFieldControllerBuilder.create(opt)
                         .min(0)
                         .max(600))
@@ -197,19 +197,19 @@ public class ConfigScreen {
         final var thresholdOption = Option.<Integer>createBuilder()
                 .name(Component.translatable("settings.clientstorage.packet_threshold"))
                 .description(OptionDescription.of(Component.translatable("tooltip.clientstorage.packet_threshold")))
-                .binding(4, PacketLimiter.CUSTOM::getThreshold, PacketLimiter.CUSTOM::setThreshold)
+                .binding(4, PacketLimits.CUSTOM::getThreshold, PacketLimits.CUSTOM::setThreshold)
                 .controller(opt -> IntegerFieldControllerBuilder.create(opt)
                         .min(1)
                         .max(8))
                 .build();
 
-        customLimiterCategory.option(Option.<PacketLimiter>createBuilder()
+        customLimiterCategory.option(Option.<PacketLimits>createBuilder()
                 .name(Component.translatable("settings.clientstorage.limiter_type"))
-                .binding(PacketLimiter.getServerLimiter(), () -> FabricConfig.limiter, value -> {
+                .binding(PacketLimits.getServerLimiter(), () -> FabricConfig.limiter, value -> {
                     FabricConfig.limiter = value;
 
                     // Disable custom limiter category if not set to custom
-                    if (value != PacketLimiter.CUSTOM) {
+                    if (value != PacketLimits.CUSTOM) {
                         customDelayOption.setAvailable(false);
                         thresholdOption.setAvailable(false);
                     } else {
@@ -218,11 +218,11 @@ public class ConfigScreen {
                     }
                 })
                 .controller(opt -> EnumControllerBuilder.create(opt)
-                        .enumClass(PacketLimiter.class))
+                        .enumClass(PacketLimits.class))
                 .build());
 
-        customDelayOption.setAvailable(FabricConfig.limiter == PacketLimiter.CUSTOM);
-        thresholdOption.setAvailable(FabricConfig.limiter == PacketLimiter.CUSTOM);
+        customDelayOption.setAvailable(FabricConfig.limiter == PacketLimits.CUSTOM);
+        thresholdOption.setAvailable(FabricConfig.limiter == PacketLimits.CUSTOM);
 
         customLimiterCategory.option(customDelayOption);
         customLimiterCategory.option(thresholdOption);

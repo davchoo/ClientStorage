@@ -27,6 +27,7 @@ import org.samo_lego.clientstorage.fabric_client.config.FabricConfig;
 import org.samo_lego.clientstorage.fabric_client.inventory.RemoteInventory;
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.ACompoundContainer;
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.AMultiPlayerGamemode;
+import org.samo_lego.clientstorage.fabric_client.network.PacketLimiter;
 import org.samo_lego.clientstorage.fabric_client.render.ESPRender;
 import org.samo_lego.clientstorage.fabric_client.storage.InteractableContainer;
 import org.samo_lego.clientstorage.fabric_client.storage.InteractableContainerBlock;
@@ -51,7 +52,6 @@ public class ContainerDiscovery {
     private static InteractableContainer expectedInventory = null;
     public static BlockHitResult lastCraftingHit = null;
 
-    private static long fakePacketCount = 0;
     private static long fakePacketsTimestamp = 0;
     private static CompletableFuture<?> watchdog;
 
@@ -217,7 +217,6 @@ public class ContainerDiscovery {
     }
 
     private static void startSendPackets() {
-        fakePacketCount = 0;
         if (config.informSearch) {
             ClientStorageFabric.displayMessage("gameplay.clientstorage.performing_search");
         }
@@ -247,7 +246,6 @@ public class ContainerDiscovery {
      * Send a packets from interaction queue.
      */
     public static void sendNextPacket() {
-        int sleep = FabricConfig.limiter.getDelay();
         fakePacketsTimestamp = System.currentTimeMillis();
         expectedInventory = null;
 
@@ -272,14 +270,6 @@ public class ContainerDiscovery {
                 }
 
                 ClientStorageFabric.tryLog("Sending packets :: " + container.cs_info(), ChatFormatting.AQUA);
-                if (container.cs_isDelayed() && fakePacketCount++ >= FabricConfig.limiter.getThreshold()) {
-                    fakePacketCount = 0;
-                    try {
-                        Thread.sleep(sleep);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                }
                 expectedInventory = container;
                 container.cs_sendInteractionPacket();
                 return;
@@ -290,16 +280,11 @@ public class ContainerDiscovery {
             }
         }
         ClientStorageFabric.tryLog("Finished sending packets", ChatFormatting.GREEN);
+        reopenCraftingTable();
+    }
 
-        if (fakePacketCount >= FabricConfig.limiter.getThreshold()) {
-            try {
-                Thread.sleep(sleep);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
-        }
-
-        // Send open crafting packet
+    public static void reopenCraftingTable() {
+        PacketLimiter.needDelay();
         Minecraft client = Minecraft.getInstance();
         var gm = (AMultiPlayerGamemode) client.gameMode;
         gm.cs_startPrediction(client.level, id ->

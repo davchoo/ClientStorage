@@ -10,6 +10,7 @@ import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
+import org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery;
 import org.samo_lego.clientstorage.fabric_client.inventory.RemoteInventory;
 import org.samo_lego.clientstorage.fabric_client.network.PacketGame;
 import org.samo_lego.clientstorage.fabric_client.storage.InteractableContainer;
@@ -157,7 +158,7 @@ public interface IRemoteStack {
         // Close container
         PacketGame.closeCurrentScreen();
         // Open crafting again
-        PacketGame.openCrafting();
+        ContainerDiscovery.reopenCraftingTable();
 
         // Add to remote inventory
         ((IRemoteStack) stack).cs_setSlotId(containerSlot);

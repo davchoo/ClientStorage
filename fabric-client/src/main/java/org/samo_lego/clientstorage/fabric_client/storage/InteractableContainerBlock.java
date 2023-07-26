@@ -7,6 +7,7 @@ import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.phys.BlockHitResult;
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.AMultiPlayerGamemode;
+import org.samo_lego.clientstorage.fabric_client.network.PacketLimiter;
 import org.samo_lego.clientstorage.fabric_client.render.ESPRender;
 import org.samo_lego.clientstorage.fabric_client.util.PlayerLookUtil;
 
@@ -19,6 +20,7 @@ public interface InteractableContainerBlock extends InteractableContainer {
 
     @Override
     default void cs_sendInteractionPacket() {
+        PacketLimiter.needDelay();
         InteractableContainer.super.cs_sendInteractionPacket();
         var gm = (AMultiPlayerGamemode) Minecraft.getInstance().gameMode;
         var hitResult = PlayerLookUtil.raycastTo(this.cs_position());

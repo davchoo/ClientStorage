@@ -5,18 +5,15 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
 import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
-import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import org.samo_lego.clientstorage.fabric_client.casts.ICSPlayer;
+import org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery;
 import org.samo_lego.clientstorage.fabric_client.network.PacketGame;
 import org.samo_lego.clientstorage.fabric_client.storage.InteractableContainer;
-
-import static org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery.lastCraftingHit;
 
 
 public class RemoteSlot extends Slot {
@@ -85,9 +82,7 @@ public class RemoteSlot extends Slot {
 
         // Close container
         PacketGame.closeCurrentScreen();
-
-        // Open crafting again
-        player.connection.send(new ServerboundUseItemOnPacket(InteractionHand.MAIN_HAND, lastCraftingHit, containerId));
+        ContainerDiscovery.reopenCraftingTable();
         // TODO pickup to cursor if not QUICK_MOVE
     }
 

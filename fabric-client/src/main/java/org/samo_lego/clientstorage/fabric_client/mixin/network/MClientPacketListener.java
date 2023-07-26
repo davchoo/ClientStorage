@@ -9,7 +9,7 @@ import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.world.inventory.MenuType;
 import org.samo_lego.clientstorage.fabric_client.casts.ICSPlayer;
 import org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery;
-import org.samo_lego.clientstorage.fabric_client.network.PacketLimiter;
+import org.samo_lego.clientstorage.fabric_client.network.PacketLimits;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -114,6 +114,6 @@ public class MClientPacketListener {
                     target = "Lnet/minecraft/client/player/LocalPlayer;setServerBrand(Ljava/lang/String;)V",
                     shift = At.Shift.AFTER))
     private void onServerBrand(ClientboundCustomPayloadPacket packet, CallbackInfo ci) {
-        PacketLimiter.tryRecognizeServer();
+        PacketLimits.tryRecognizeServer();
     }
 }
