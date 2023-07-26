@@ -127,7 +127,7 @@ public class RemoteInventory implements Container {
         var displayStack = stacks.getFirst();
 
         final ItemStack removed = stacks.removeLast();
-        FREE_SPACE_CONTAINERS.compute(removed.cs_getContainer(), (container, freeSpace) -> freeSpace == null ? removed.getCount() : freeSpace + removed.getCount());
+        FREE_SPACE_CONTAINERS.compute(removed.cs_getContainer(), (container, freeSpace) -> freeSpace == null ? removed.getCount() : freeSpace + 1);
 
         if (!stacks.isEmpty()) {
             displayStack.shrink(removed.getCount());
@@ -199,66 +199,49 @@ public class RemoteInventory implements Container {
         }
         value = value.toLowerCase(Locale.ROOT);
 
-        List<LinkedList<ItemStack>> filtered = this.stacks;
-        if (value.startsWith(this.searchValue) && this.searchStacks != null) {
-            // Fewer items to search through, use the cached results
-            filtered = this.searchStacks;
+        if (!value.startsWith(this.searchValue) || this.searchStacks == null) {
+            // Can't reuse result
+            this.searchStacks = new ArrayList<>(this.stacks);
         }
 
         this.searchValue = value;
 
-        if (value.startsWith("$")) {
-            value = value.substring(1);
-
-            String finalValue = value;
-            this.searchStacks = new ArrayList<>(filtered.stream().filter(stackPair -> stackPair.getFirst().getItemHolder().tags().anyMatch(tagKey -> {
+        if (value.startsWith("$")) { // Item tags
+            String finalValue = value.substring(1);
+            this.searchStacks = new ArrayList<>(this.stacks);
+            this.searchStacks.removeIf(stackPair -> stackPair.getFirst().getItemHolder().tags().noneMatch(tagKey -> {
                 ResourceLocation location = tagKey.location();
-                String tagName;
                 if (finalValue.contains(":")) {
-                    tagName = location.toString();
+                    return location.toString().startsWith(finalValue);
                 } else {
-                    tagName = location.getPath();
+                    return location.getPath().startsWith(finalValue);
                 }
-                tagName = tagName.toLowerCase(Locale.ROOT);
-
-                return tagName.startsWith(finalValue);
-
-            })).toList());
-        } else if (value.startsWith("#")) {
-            value = value.substring(1);
-
-            String finalValue = value;
-            this.searchStacks = new ArrayList<>(filtered.stream().filter(stackPair -> {
+            }));
+        } else if (value.startsWith("#")) { // SNBT Tag
+            String finalValue = value.substring(1);
+            this.searchStacks.removeIf(stackPair -> {
                 CompoundTag tag = stackPair.getFirst().getTag();
-                if (tag == null) {
-                    return false;
-                }
-                return tag.toString().toLowerCase(Locale.ROOT).contains(finalValue);
-
-            }).toList());
-        } else if (value.startsWith("@")) {
-            String finalValue = value;
-            this.searchStacks = new ArrayList<>(filtered.stream().filter(stackPair -> {
-                var search = finalValue.substring(1).split(" ");
-                String namespace = search[0];
+                return tag == null || !tag.toString().toLowerCase(Locale.ROOT).contains(finalValue);
+            });
+        } else if (value.startsWith("@")) { // Namespace
+            String[] tokens = value.substring(1).split(" ", 2);
+            String namespace = tokens[0];
+            this.searchStacks.removeIf(stackPair -> {
                 final var item = stackPair.getFirst();
-
-                boolean namespaceFltr = BuiltInRegistries.ITEM.getKey(item.getItem()).toString().startsWith(namespace);
-
-                if (namespaceFltr && search.length > 1) {
-                    return item.getDisplayName().getString().toLowerCase(Locale.ROOT).contains(search[1]);
+                boolean namespaceMatch = BuiltInRegistries.ITEM.getKey(item.getItem()).getNamespace().startsWith(namespace);
+                if (!namespaceMatch) {
+                    return true;
+                } else if (tokens.length > 1) {
+                    return !item.getDisplayName().getString().toLowerCase(Locale.ROOT).contains(tokens[1]);
                 }
-
-                return namespaceFltr;
-            }).toList());
-        } else {
+                return false;
+            });
+        } else { // Display name
             String finalValue = value;
-            this.searchStacks = new ArrayList<>(filtered.stream()
-                    .filter(stack ->
-                            stack.getFirst().getDisplayName()
-                                    .getString().toLowerCase(Locale.ROOT)
-                                    .contains(finalValue.toLowerCase(Locale.ROOT)))
-                    .toList());
+            this.searchStacks.removeIf(stack ->
+                    !stack.getFirst().getDisplayName()
+                            .getString().toLowerCase(Locale.ROOT)
+                            .contains(finalValue.toLowerCase(Locale.ROOT)));
         }
     }
 
