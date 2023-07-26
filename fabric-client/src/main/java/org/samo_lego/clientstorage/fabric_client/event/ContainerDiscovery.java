@@ -48,18 +48,19 @@ import static org.samo_lego.clientstorage.fabric_client.ClientStorageFabric.conf
 public class ContainerDiscovery {
 
     private static final Queue<InteractableContainer> INTERACTION_Q = new ConcurrentLinkedQueue<>();
-    private static final Queue<InteractableContainer> EXPECTED_INVENTORIES = new ConcurrentLinkedQueue<>();
+    private static InteractableContainer expectedInventory = null;
     public static BlockHitResult lastCraftingHit = null;
 
-    private static long fakePacketsDuration = 0;
+    private static long fakePacketCount = 0;
+    private static long fakePacketsTimestamp = 0;
+    private static CompletableFuture<?> watchdog;
 
     public static boolean fakePacketsActive() {
-        return fakePacketsDuration > System.currentTimeMillis();
+        return (fakePacketsTimestamp + 5000) > System.currentTimeMillis();
     }
 
-
     public static void resetFakePackets() {
-        fakePacketsDuration = 0;
+        fakePacketsTimestamp = 0;
     }
 
     public static InteractionResult onUseBlock(Player player, Level world, InteractionHand hand, BlockHitResult hitResult) {
@@ -102,7 +103,7 @@ public class ContainerDiscovery {
                 }
 
                 if (!INTERACTION_Q.isEmpty()) {
-                    CompletableFuture.runAsync(ContainerDiscovery::sendPackets);
+                    CompletableFuture.runAsync(ContainerDiscovery::startSendPackets);
                     return InteractionResult.FAIL;  // We'll open the crafting table later
                 }
 
@@ -186,7 +187,7 @@ public class ContainerDiscovery {
 
     private static void resetInventoryCache() {
         INTERACTION_Q.clear();
-        EXPECTED_INVENTORIES.clear();
+        expectedInventory = null;
         RemoteInventory.getInstance().reset();
         StorageCache.FREE_SPACE_CONTAINERS.clear();
     }
@@ -215,23 +216,41 @@ public class ContainerDiscovery {
         return chunks;
     }
 
-    /**
-     * Sends the packets from interaction queue.
-     */
-    public static void sendPackets() {
-        int count = 0;
-        int sleep = FabricConfig.limiter.getDelay();
-        Minecraft client = Minecraft.getInstance();
-
+    private static void startSendPackets() {
+        fakePacketCount = 0;
         if (config.informSearch) {
             ClientStorageFabric.displayMessage("gameplay.clientstorage.performing_search");
         }
-
-        var gm = (AMultiPlayerGamemode) client.gameMode;
-        fakePacketsDuration = System.currentTimeMillis() + 5000;
-        EXPECTED_INVENTORIES.clear();
-
         ClientStorageFabric.tryLog("Starting to send following packets :: " + INTERACTION_Q, ChatFormatting.GREEN);
+        sendNextPacket();
+        if (watchdog == null || watchdog.isDone()) {
+            watchdog = CompletableFuture.runAsync(ContainerDiscovery::startWatchdog);
+        }
+    }
+
+    private static void startWatchdog() {
+        while (!INTERACTION_Q.isEmpty() || expectedInventory != null) {
+            long timeSinceLastPacket = System.currentTimeMillis() - fakePacketsTimestamp;
+            if (timeSinceLastPacket > 1500) {
+                ClientStorageFabric.tryLog("No response, skipping to next interaction", ChatFormatting.RED);
+                sendNextPacket();
+            }
+            try {
+                Thread.sleep(250);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /**
+     * Send a packets from interaction queue.
+     */
+    public static void sendNextPacket() {
+        int sleep = FabricConfig.limiter.getDelay();
+        fakePacketsTimestamp = System.currentTimeMillis();
+        expectedInventory = null;
+
         while (!INTERACTION_Q.isEmpty()) {
             try {
                 InteractableContainer container = INTERACTION_Q.poll();
@@ -253,21 +272,17 @@ public class ContainerDiscovery {
                 }
 
                 ClientStorageFabric.tryLog("Sending packets :: " + container.cs_info(), ChatFormatting.AQUA);
-                if (container.cs_isDelayed() && count++ >= FabricConfig.limiter.getThreshold()) {
-                    count = 0;
+                if (container.cs_isDelayed() && fakePacketCount++ >= FabricConfig.limiter.getThreshold()) {
+                    fakePacketCount = 0;
                     try {
                         Thread.sleep(sleep);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
                 }
-
+                expectedInventory = container;
                 container.cs_sendInteractionPacket();
-                // Close container packet
-                client.player.connection.send(new ServerboundContainerClosePacket(0));
-
-                EXPECTED_INVENTORIES.add(container);
-                ClientStorageFabric.tryLog("Added to expected inventories :: " + container.cs_info(), ChatFormatting.AQUA);
+                return;
             } catch (Exception e) {
                 ClientStorageFabric.tryLog("Error while sending packets", ChatFormatting.RED);
                 ClientStorageFabric.tryLog(e.getMessage(), ChatFormatting.RED);
@@ -276,7 +291,7 @@ public class ContainerDiscovery {
         }
         ClientStorageFabric.tryLog("Finished sending packets", ChatFormatting.GREEN);
 
-        if (count >= FabricConfig.limiter.getThreshold()) {
+        if (fakePacketCount >= FabricConfig.limiter.getThreshold()) {
             try {
                 Thread.sleep(sleep);
             } catch (InterruptedException e) {
@@ -285,6 +300,8 @@ public class ContainerDiscovery {
         }
 
         // Send open crafting packet
+        Minecraft client = Minecraft.getInstance();
+        var gm = (AMultiPlayerGamemode) client.gameMode;
         gm.cs_startPrediction(client.level, id ->
                 new ServerboundUseItemOnPacket(InteractionHand.MAIN_HAND, lastCraftingHit, id));
     }
@@ -295,8 +312,7 @@ public class ContainerDiscovery {
     }
 
     public static void onInventoryPacket(final ClientboundContainerSetContentPacket packet) {
-        final InteractableContainer container = EXPECTED_INVENTORIES.poll();
-        if (container == null) {
+        if (expectedInventory == null) {
             if (packet.getContainerId() != 0 && fakePacketsActive()) {
                 ClientStorageFabric.tryLog("Received unexpected inventory packet", ChatFormatting.RED);
             }
@@ -304,23 +320,28 @@ public class ContainerDiscovery {
         }
 
         var stacks = packet.getItems();
-        if (container.getContainerSize() + 36 != stacks.size()) {
+        if (expectedInventory.getContainerSize() + 36 != stacks.size()) {
             ClientStorageFabric.tryLog(String.format("Container size mismatch, expected %d [%s] but got %d.%n",
-                            container.getContainerSize(), container.cs_info(), stacks.size() - 36),
+                            expectedInventory.getContainerSize(), expectedInventory.cs_info(), stacks.size() - 36),
                     ChatFormatting.RED);
         }
 
         ClientStorageFabric.tryLog(String.format("Received inventory packet for %s with: %s",
-                container.cs_info(),
+                expectedInventory.cs_info(),
                 stacks.stream().filter(s -> !s.isEmpty()).toList()), ChatFormatting.YELLOW);
 
-        container.cs_parseOpenPacket(packet);
+        expectedInventory.cs_parseOpenPacket(packet);
+        expectedInventory = null;
+        // Close container packet
+        Minecraft.getInstance().player.connection.send(new ServerboundContainerClosePacket(packet.getContainerId()));
+
+        sendNextPacket();
     }
 
     public static void onCraftingScreenOpen() {
         resetFakePackets();
         INTERACTION_Q.clear();
-        EXPECTED_INVENTORIES.clear();
+        expectedInventory = null;
         RemoteInventory.getInstance().sort();
     }
 }
