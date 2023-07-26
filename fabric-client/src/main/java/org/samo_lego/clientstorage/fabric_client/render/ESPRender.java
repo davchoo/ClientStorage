@@ -16,7 +16,6 @@ import net.minecraft.world.phys.Vec3;
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.AEntity;
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.ALevelRenderer;
 
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -45,11 +44,7 @@ public class ESPRender {
     private static final Set<BlockPos> BLOCK_ESPS = ConcurrentHashMap.newKeySet();
 
     public static void render(PoseStack matrices, Camera camera, OutlineBufferSource vertexConsumers) {
-        Vec3 pos = camera.getPosition();
-        matrices.pushPose();
-        matrices.translate(-pos.x, -pos.y, -pos.z);
-        renderBlockOutlines(matrices, pos, vertexConsumers);
-        matrices.popPose();
+        renderBlockOutlines(matrices, camera.getPosition(), vertexConsumers);
     }
 
     public static void renderBlockOutlines(PoseStack matrices, Vec3 playerPos, OutlineBufferSource vertexConsumers) {
@@ -60,12 +55,9 @@ public class ESPRender {
             if (squareDist > 8 * 8) continue;
 
             matrices.pushPose();
-            matrices.translate(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5);
-            matrices.pushPose();
-            matrices.translate(-0.5, -0.5, -0.5);
+            matrices.translate(pos.getX() - playerPos.x, pos.getY() - playerPos.y, pos.getZ() - playerPos.z);
 
             CUBE.compile(matrices.last(), vertexConsumers.getBuffer(RENDER_TYPE), 0, OverlayTexture.WHITE_OVERLAY_V, 0, 0, 0, 0);
-            matrices.popPose();
             matrices.popPose();
         }
     }
