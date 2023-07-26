@@ -234,13 +234,13 @@ public abstract class MCraftingScreen extends AbstractContainerScreen<CraftingMe
                     ci.cancel();
                     return;
                 }
-                final ItemStack item = RemoteInventory.getInstance().removeItemNoUpdate(slot.getContainerSlot());
-                final ItemStack carried = minecraft.player.containerMenu.getCarried();
 
+                final ItemStack item = RemoteInventory.getInstance().getItem(slot.getContainerSlot());
+                final ItemStack carried = minecraft.player.containerMenu.getCarried();
                 if (carried.isEmpty() && !item.isEmpty()) {
                     // Taking item out from remote inventory
-                    remoteSlot.onTake(item, actionType);
-                } else if (!carried.isEmpty() && item.isEmpty()) {
+                    remoteSlot.onTake(actionType);
+                } else if (!carried.isEmpty()) {
                     // Putting item into remote inventory
                     remoteSlot.onPut(carried);
                 }
