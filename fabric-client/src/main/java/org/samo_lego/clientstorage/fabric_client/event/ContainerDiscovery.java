@@ -11,6 +11,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
@@ -40,6 +41,7 @@ import java.util.List;
 import java.util.Queue;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.function.Consumer;
 
 import static org.samo_lego.clientstorage.fabric_client.ClientStorageFabric.config;
 
@@ -49,8 +51,11 @@ import static org.samo_lego.clientstorage.fabric_client.ClientStorageFabric.conf
 public class ContainerDiscovery {
 
     private static final Queue<InteractableContainer> INTERACTION_Q = new ConcurrentLinkedQueue<>();
+    private static final Queue<Consumer<AbstractContainerMenu>> PENDING_ACTIONS_Q = new ConcurrentLinkedQueue<>();
+
     private static InteractableContainer expectedInventory = null;
     public static BlockHitResult lastCraftingHit = null;
+    public static int craftingPickupSlotId = -1;
 
     private static long fakePacketsTimestamp = 0;
     private static CompletableFuture<?> watchdog;
@@ -130,7 +135,7 @@ public class ContainerDiscovery {
         }
 
         if (!singleplayer && (container.isEmpty() || !config.enableCaching)) {
-            INTERACTION_Q.add(container);
+            addPendingInteraction(container, container::cs_storeContents);
             StorageCache.FREE_SPACE_CONTAINERS.put(container, container.getContainerSize());
         } else if (!container.isEmpty()) {
             for (int i = 0; i < container.getContainerSize(); ++i) {
@@ -187,6 +192,8 @@ public class ContainerDiscovery {
 
     private static void resetInventoryCache() {
         INTERACTION_Q.clear();
+        PENDING_ACTIONS_Q.clear();
+        craftingPickupSlotId = -1;
         expectedInventory = null;
         RemoteInventory.getInstance().reset();
         StorageCache.FREE_SPACE_CONTAINERS.clear();
@@ -216,7 +223,7 @@ public class ContainerDiscovery {
         return chunks;
     }
 
-    private static void startSendPackets() {
+    public static void startSendPackets() {
         if (config.informSearch) {
             ClientStorageFabric.displayMessage("gameplay.clientstorage.performing_search");
         }
@@ -299,9 +306,19 @@ public class ContainerDiscovery {
         RemoteInventory.getInstance().addStack(IRemoteStack.fromStack(stack, source, slotId).copy());
     }
 
+    public static void addPendingInteraction(InteractableContainer container, Consumer<AbstractContainerMenu> pendingAction) {
+        INTERACTION_Q.add(container);
+        PENDING_ACTIONS_Q.add(pendingAction);
+    }
+
     public static void onInventoryInitialize(AbstractContainerMenu containerMenu) {
+        var mc = Minecraft.getInstance();
+        var player = mc.player;
         if (expectedInventory == null) {
-            if (containerMenu.getType() != null && fakePacketsActive()) {
+            if (containerMenu.getType() == MenuType.CRAFTING && craftingPickupSlotId != -1) {
+                mc.gameMode.handleInventoryMouseClick(containerMenu.containerId, craftingPickupSlotId, 0, ClickType.PICKUP, player);
+                craftingPickupSlotId = -1;
+            } else if (containerMenu.getType() != null && fakePacketsActive()) {
                 ClientStorageFabric.tryLog("Received unexpected inventory initialize", ChatFormatting.RED);
             }
             return;
@@ -319,13 +336,13 @@ public class ContainerDiscovery {
                 expectedInventory.cs_info(),
                 stacks.stream().filter(s -> !s.isEmpty()).toList()), ChatFormatting.YELLOW);
 
-        if (containerMenu.getType() != MenuType.CRAFTING) {
-            // No need to parse the crafting menu
-            expectedInventory.cs_storeContents(containerMenu);
+        Consumer<AbstractContainerMenu> pendingAction = PENDING_ACTIONS_Q.poll();
+        if (pendingAction != null) {
+            pendingAction.accept(containerMenu);
         }
         expectedInventory = null;
         // Close container packet
-        Minecraft.getInstance().player.connection.send(new ServerboundContainerClosePacket(containerMenu.containerId));
+        player.connection.send(new ServerboundContainerClosePacket(containerMenu.containerId));
 
         sendNextPacket();
     }
@@ -333,6 +350,7 @@ public class ContainerDiscovery {
     public static void onCraftingScreenOpen() {
         resetFakePackets();
         INTERACTION_Q.clear();
+        PENDING_ACTIONS_Q.clear();
         expectedInventory = null;
         RemoteInventory.getInstance().sort();
     }

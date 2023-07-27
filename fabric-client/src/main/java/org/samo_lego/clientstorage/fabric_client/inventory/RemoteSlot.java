@@ -1,9 +1,6 @@
 package org.samo_lego.clientstorage.fabric_client.inventory;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.client.Minecraft;
-import net.minecraft.core.NonNullList;
-import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
 import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
@@ -12,7 +9,6 @@ import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
 import org.samo_lego.clientstorage.fabric_client.casts.ICSPlayer;
 import org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery;
-import org.samo_lego.clientstorage.fabric_client.network.PacketGame;
 import org.samo_lego.clientstorage.fabric_client.storage.InteractableContainer;
 
 
@@ -22,21 +18,9 @@ public class RemoteSlot extends Slot {
     }
 
     public void onTake(ClickType clickType) {
-        // Get first free slot in player's inventory (to move items to)
+        // Make sure the player has an empty slot
         var player = Minecraft.getInstance().player;
-
-        int freeSlot = player.getInventory().getSlotWithRemainingSpace(getItem());
-        if (freeSlot == -1) {
-            NonNullList<ItemStack> items = player.getInventory().items;
-            for (int i = items.size() - 1; i >= 0; --i) {
-                if (items.get(i).isEmpty()) {
-                    freeSlot = i + 9;
-                    break;
-                }
-            }
-        }
-
-        if (freeSlot == -1) {
+        if (player.getInventory().getFreeSlot() == -1) {
             return;
         }
 
@@ -59,31 +43,39 @@ public class RemoteSlot extends Slot {
         }
         container.removeItemNoUpdate(stack.cs_getSlotId());
 
-        int containerId = player.containerMenu.containerId;
-
         // Close crafting
-        player.connection.send(new ServerboundContainerClosePacket(containerId));
+        player.connection.send(new ServerboundContainerClosePacket(player.containerMenu.containerId));
 
         // Helps us ignore GUI open packet later then
         ((ICSPlayer) player).cs_setAccessingItem(true);
-        // Open container
-        stack.cs_getContainer().cs_sendInteractionPacket();
 
-        var map = new Int2ObjectOpenHashMap<ItemStack>();
-        map.put(stack.cs_getSlotId(), ItemStack.EMPTY);
-        map.put(freeSlot, stack.copy());
+        ContainerDiscovery.addPendingInteraction(sourceContainer, containerMenu -> {
+            if (!containerMenu.getSlot(stack.cs_getSlotId()).getItem().is(stack.getItem())) {
+                // TODO restart search
+                return;
+            }
+            // Find an empty slot in the player's inventory
+            int targetSlot = -1;
+            for (int i = sourceContainer.getContainerSize(); i < containerMenu.slots.size(); i++) {
+                if (containerMenu.getSlot(i).getItem().isEmpty()) {
+                    targetSlot = i;
+                    if (clickType != ClickType.QUICK_MOVE) {
+                        ContainerDiscovery.craftingPickupSlotId = targetSlot - sourceContainer.getContainerSize() + /* CraftingMenu.INV_SLOT_START */ 10;
+                    }
+                    break;
+                }
+            }
+            if (targetSlot != -1) {
+                // Pickup the item
+                Minecraft.getInstance().gameMode.handleInventoryMouseClick(containerMenu.containerId, stack.cs_getSlotId(), 0, ClickType.PICKUP, player);
+                // Put the item in the player's inventory
+                Minecraft.getInstance().gameMode.handleInventoryMouseClick(containerMenu.containerId, targetSlot, 0, ClickType.PICKUP, player);
 
-        // TODO Move to the free slot instead of merging
-        var packet = new ServerboundContainerClickPacket(containerId + 1, 1, stack.cs_getSlotId(), 0, ClickType.QUICK_MOVE, ItemStack.EMPTY, map);
-        // Send transfer item packet
-        player.connection.send(packet);
+                stack.cs_clearData();
+            }
+        });
 
-        stack.cs_clearData();
-
-        // Close container
-        PacketGame.closeCurrentScreen();
-        ContainerDiscovery.reopenCraftingTable();
-        // TODO pickup to cursor if not QUICK_MOVE
+        ContainerDiscovery.startSendPackets();
     }
 
     public void onPut(ItemStack stack) {
