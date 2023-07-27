@@ -1,22 +1,17 @@
 package org.samo_lego.clientstorage.fabric_client.casts;
 
-import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.game.ServerboundContainerClickPacket;
-import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery;
 import org.samo_lego.clientstorage.fabric_client.inventory.RemoteInventory;
-import org.samo_lego.clientstorage.fabric_client.network.PacketGame;
 import org.samo_lego.clientstorage.fabric_client.storage.InteractableContainer;
 
 import java.util.Map;
-import java.util.Optional;
 
 import static org.samo_lego.clientstorage.fabric_client.util.StorageCache.FREE_SPACE_CONTAINERS;
 
@@ -29,7 +24,9 @@ public interface IRemoteStack {
 
     int cs_getSlotId();
 
-    void cs_setSlotId(int slotId);
+    void cs_setSlot(InteractableContainer container, int slotId);
+
+    InteractableContainer cs_getContainer();
 
     /**
      * Assigns remote container data to provided item stack.
@@ -41,22 +38,13 @@ public interface IRemoteStack {
      */
     static ItemStack fromStack(ItemStack stack, InteractableContainer container, int slot) {
         // Add properties to ItemStack via IRemoteStack interface
-        IRemoteStack remote = (IRemoteStack) stack;
-        remote.cs_setSlotId(slot);
-        remote.cs_setContainer(container);
-
+        stack.cs_setSlot(container, slot);
         return stack;
     }
 
-    InteractableContainer cs_getContainer();
-
     default void cs_clearData() {
-        this.cs_setContainer(null);
-        this.cs_setSlotId(-1);
+        this.cs_setSlot(null, -1);
     }
-
-    void cs_setContainer(InteractableContainer parent);
-
 
     /**
      * Transfers this stack to any of
@@ -94,81 +82,58 @@ public interface IRemoteStack {
      * @see org.samo_lego.clientstorage.fabric_client.util.StorageCache#FREE_SPACE_CONTAINERS
      */
     default void cs_transfer2Remote(boolean carried, int freeSlot) {
-        // TODO allow partial stacking
-        var player = Minecraft.getInstance().player;
+        var mc = Minecraft.getInstance();
+        var player = mc.player;
 
-        Optional<Map.Entry<InteractableContainer, Integer>> containerCandidate = FREE_SPACE_CONTAINERS.entrySet().stream().findAny();
-
-        if (containerCandidate.isEmpty()) {
+        final InteractableContainer container = FREE_SPACE_CONTAINERS.entrySet()
+                .stream()
+                .filter(entry -> entry.getValue() > 0)
+                .map(Map.Entry::getKey)
+                .findAny()
+                .orElse(null);
+        if (container == null) {
             player.sendSystemMessage(Component.literal("No free space containers found.").withStyle(ChatFormatting.RED));
             return;
         }
 
-        final ItemStack stack = (ItemStack) this;
-
-        int containerId = player.containerMenu.containerId;
-
-        var map = new Int2ObjectOpenHashMap<ItemStack>();
         if (carried) {
-            // "Put" item in free slot
-            map.put(freeSlot, stack);
-            var transferPacket = new ServerboundContainerClickPacket(containerId, 1, freeSlot, 0, ClickType.PICKUP, ItemStack.EMPTY, map);
-            player.connection.send(transferPacket);
+            mc.gameMode.handleInventoryMouseClick(player.containerMenu.containerId, freeSlot, 0, ClickType.PICKUP, player);
         }
 
-        // Close crafting
-        player.connection.send(new ServerboundContainerClosePacket(containerId));
+        // Free slot in player's inv now has different index due to new container being open
+        int sourceSlot = freeSlot - CRAFTING_SLOT_OFFSET + container.getContainerSize();
+        ContainerDiscovery.addPendingInteraction(container, containerMenu -> {
+            // Pick up the item from the player's inventory
+            mc.gameMode.handleInventoryMouseClick(containerMenu.containerId, sourceSlot, 0, ClickType.PICKUP, player);
+            // TODO allow partial stacking
+            // Place the item in the free slot in the container and count the amount of empty slots left
+            boolean inserted = false;
+            int spaceLeft = 0;
+            for (int containerSlot = 0; containerSlot < container.getContainerSize(); ++containerSlot) {
+                if (containerMenu.getSlot(containerSlot).getItem().isEmpty()) {
+                    if (!inserted) {
+                        inserted = true;
+                        mc.gameMode.handleInventoryMouseClick(containerMenu.containerId, containerSlot, 0, ClickType.PICKUP, player);
+                        ItemStack stack = containerMenu.getSlot(containerSlot).getItem();
+                        stack.cs_setSlot(container, containerSlot);
 
-        // Helps us ignore GUI open packet later then
-        ((ICSPlayer) player).cs_setAccessingItem(true);
-
-        Map.Entry<InteractableContainer, Integer> emptyContainer = containerCandidate.get();
-
-        // Check left space
-        int spaceLeft = emptyContainer.getValue() - 1; // Number of slots left
-        if (spaceLeft <= 0) {
-            FREE_SPACE_CONTAINERS.remove(emptyContainer.getKey());
-        } else {
-            FREE_SPACE_CONTAINERS.put(emptyContainer.getKey(), spaceLeft);
-        }
-
-        final InteractableContainer container = emptyContainer.getKey();
-        // Open container
-        container.cs_sendInteractionPacket();
-
-        // Free slot in player's inv now has different index due to new container being open ...
-        freeSlot = freeSlot - CRAFTING_SLOT_OFFSET + container.getContainerSize();
-
-        map.clear();
-        map.put(freeSlot, ItemStack.EMPTY);
-
-        // Get first free slot in container
-        int containerSlot;
-        for (containerSlot = 0; containerSlot < container.getContainerSize(); ++containerSlot) {
-            if (container.getItem(containerSlot).isEmpty()) {
-                map.put(containerSlot, stack);
-                break;
+                        // Add to remote
+                        final var copiedStack = stack.copy();
+                        RemoteInventory.getInstance().addStack(copiedStack);
+                        container.setItem(containerSlot, copiedStack);
+                    } else {
+                        spaceLeft++;
+                    }
+                }
             }
-        }
-
-        // Send transfer item packet
-        var transferPacket = new ServerboundContainerClickPacket(containerId + 1, 1, freeSlot, 0, ClickType.QUICK_MOVE, stack, map);
-        player.connection.send(transferPacket);
-
-        // Close container
-        PacketGame.closeCurrentScreen();
-        // Open crafting again
-        ContainerDiscovery.reopenCraftingTable();
-
-        // Add to remote inventory
-        ((IRemoteStack) stack).cs_setSlotId(containerSlot);
-        ((IRemoteStack) stack).cs_setContainer(container);
-
-        final var copiedStack = stack.copy();
-        RemoteInventory.getInstance().addStack(copiedStack);
-        if (containerSlot != container.getContainerSize())
-            container.setItem(containerSlot, copiedStack);
-        else System.out.println("Container @ " + container + " is full!");
-        stack.setCount(0);
+            // Check left space
+            if (spaceLeft <= 0) {
+                FREE_SPACE_CONTAINERS.remove(container);
+            } else {
+                FREE_SPACE_CONTAINERS.put(container, spaceLeft);
+            }
+            // TODO find a different container if it was full
+        });
+        ContainerDiscovery.startSendPackets();
     }
 }

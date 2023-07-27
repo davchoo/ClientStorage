@@ -53,9 +53,6 @@ public abstract class MCraftingScreen extends AbstractContainerScreen<CraftingMe
     private EditBox searchBox;
 
     @Unique
-    private final CraftingScreen self = (CraftingScreen) (Object) this;
-
-    @Unique
     private static final ResourceLocation TEXTURE_SEARCH = new ResourceLocation("textures/gui/container/creative_inventory/tab_item_search.png");
     @Unique
     private ImageButton recipeBook;
@@ -236,7 +233,7 @@ public abstract class MCraftingScreen extends AbstractContainerScreen<CraftingMe
                 }
 
                 final ItemStack item = RemoteInventory.getInstance().getItem(slot.getContainerSlot());
-                final ItemStack carried = minecraft.player.containerMenu.getCarried();
+                final ItemStack carried = this.menu.getCarried();
                 if (carried.isEmpty() && !item.isEmpty()) {
                     // Taking item out from remote inventory
                     remoteSlot.onTake(actionType);

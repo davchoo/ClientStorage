@@ -10,21 +10,8 @@ import java.util.Optional;
 
 @Mixin(Player.class)
 public class MPlayer_ICSPlayer implements ICSPlayer {
-
-    @Unique
-    private boolean accessingItem;
     @Unique
     private InteractableContainer lastInteractedContainer;
-
-    @Override
-    public void cs_setAccessingItem(boolean accessing) {
-        this.accessingItem = accessing;
-    }
-
-    @Override
-    public boolean cs_isAccessingItem() {
-        return this.accessingItem;
-    }
 
     @Override
     public Optional<InteractableContainer> cs_getLastInteractedContainer() {

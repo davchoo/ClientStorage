@@ -147,6 +147,9 @@ public class RemoteInventory implements Container {
     }
 
     public synchronized void addStack(ItemStack remoteStack) {
+        if (remoteStack.cs_getContainer() == null || remoteStack.cs_getSlotId() == -1) {
+            throw new IllegalArgumentException("Attempted to add remote ItemStack without container/slot data");
+        }
         // Get index of the same items
         if (config.itemDisplayType != ItemBehaviour.ItemDisplayType.SEPARATE_ALL) {
             for (var stacks : this.stacks) {

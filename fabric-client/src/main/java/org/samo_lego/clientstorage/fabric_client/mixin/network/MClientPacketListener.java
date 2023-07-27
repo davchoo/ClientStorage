@@ -20,10 +20,6 @@ import static net.minecraft.sounds.SoundSource.BLOCKS;
 @Mixin(ClientPacketListener.class)
 public class MClientPacketListener {
 
-    @Shadow
-    @Final
-    private Minecraft minecraft;
-
     /**
      * Disables incoming block sounds (e.g. barrel opening)
      * if it was generated due to mod's packets.
@@ -38,7 +34,7 @@ public class MClientPacketListener {
             cancellable = true)
     private void onSoundEvent(ClientboundSoundPacket packet, CallbackInfo ci) {
         // Cancel sounds if item search is active
-        if (packet.getSource().equals(BLOCKS) && (((ICSPlayer) this.minecraft.player).cs_isAccessingItem() || ContainerDiscovery.fakePacketsActive())) {
+        if (packet.getSource().equals(BLOCKS) && ContainerDiscovery.fakePacketsActive()) {
             ci.cancel();
         }
     }

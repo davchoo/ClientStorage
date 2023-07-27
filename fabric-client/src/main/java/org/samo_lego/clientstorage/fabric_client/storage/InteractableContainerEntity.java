@@ -43,11 +43,6 @@ public interface InteractableContainerEntity extends InteractableContainer {
     }
 
     @Override
-    default boolean cs_isDelayed() {
-        return false;
-    }
-
-    @Override
     default void cs_markGlowing() {
         // Apply fake glowing effect to the entity
         ESPRender.markEntity((Entity) this);

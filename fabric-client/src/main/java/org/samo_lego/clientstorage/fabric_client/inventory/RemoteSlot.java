@@ -1,13 +1,11 @@
 package org.samo_lego.clientstorage.fabric_client.inventory;
 
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.world.inventory.ClickType;
 import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.ChestBlock;
 import net.minecraft.world.level.block.entity.ChestBlockEntity;
-import org.samo_lego.clientstorage.fabric_client.casts.ICSPlayer;
 import org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery;
 import org.samo_lego.clientstorage.fabric_client.storage.InteractableContainer;
 
@@ -29,10 +27,7 @@ public class RemoteSlot extends Slot {
             return;
         }
 
-        // Send interaction packet to server
         InteractableContainer sourceContainer = stack.cs_getContainer();
-        //BlockPos blockPos = sourceContainer.getBlockPos();
-
         // Remove item from client container
         InteractableContainer container;
         if (sourceContainer instanceof ChestBlockEntity chest) {
@@ -42,12 +37,6 @@ public class RemoteSlot extends Slot {
             container = sourceContainer;
         }
         container.removeItemNoUpdate(stack.cs_getSlotId());
-
-        // Close crafting
-        player.connection.send(new ServerboundContainerClosePacket(player.containerMenu.containerId));
-
-        // Helps us ignore GUI open packet later then
-        ((ICSPlayer) player).cs_setAccessingItem(true);
 
         ContainerDiscovery.addPendingInteraction(sourceContainer, containerMenu -> {
             if (!containerMenu.getSlot(stack.cs_getSlotId()).getItem().is(stack.getItem())) {

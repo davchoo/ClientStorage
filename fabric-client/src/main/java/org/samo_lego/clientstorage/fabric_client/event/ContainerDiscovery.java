@@ -136,7 +136,6 @@ public class ContainerDiscovery {
 
         if (!singleplayer && (container.isEmpty() || !config.enableCaching)) {
             addPendingInteraction(container, container::cs_storeContents);
-            StorageCache.FREE_SPACE_CONTAINERS.put(container, container.getContainerSize());
         } else if (!container.isEmpty()) {
             for (int i = 0; i < container.getContainerSize(); ++i) {
                 ItemStack stack = container.getItem(i);
@@ -256,6 +255,13 @@ public class ContainerDiscovery {
         fakePacketsTimestamp = System.currentTimeMillis();
         expectedInventory = null;
 
+        var player = Minecraft.getInstance().player;
+        if (player.containerMenu != player.inventoryMenu) {
+            // Close whatever menu the player is in
+            player.connection.send(new ServerboundContainerClosePacket(player.containerMenu.containerId));
+            player.containerMenu = player.inventoryMenu;
+        }
+
         while (!INTERACTION_Q.isEmpty()) {
             try {
                 InteractableContainer container = INTERACTION_Q.poll();
@@ -318,7 +324,7 @@ public class ContainerDiscovery {
             if (containerMenu.getType() == MenuType.CRAFTING && craftingPickupSlotId != -1) {
                 mc.gameMode.handleInventoryMouseClick(containerMenu.containerId, craftingPickupSlotId, 0, ClickType.PICKUP, player);
                 craftingPickupSlotId = -1;
-            } else if (containerMenu.getType() != null && fakePacketsActive()) {
+            } else if (containerMenu != player.inventoryMenu && fakePacketsActive()) {
                 ClientStorageFabric.tryLog("Received unexpected inventory initialize", ChatFormatting.RED);
             }
             return;
@@ -341,9 +347,6 @@ public class ContainerDiscovery {
             pendingAction.accept(containerMenu);
         }
         expectedInventory = null;
-        // Close container packet
-        player.connection.send(new ServerboundContainerClosePacket(containerMenu.containerId));
-
         sendNextPacket();
     }
 

@@ -36,11 +36,6 @@ public interface InteractableContainerBlock extends InteractableContainer {
     }
 
     @Override
-    default boolean cs_isDelayed() {
-        return true;
-    }
-
-    @Override
     default void cs_markGlowing() {
         ESPRender.markBlock(cs_blockPos());
     }

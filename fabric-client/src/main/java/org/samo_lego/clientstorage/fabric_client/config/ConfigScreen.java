@@ -76,7 +76,7 @@ public class ConfigScreen {
                 .build());
 
 
-        mainCategory.option(Option.createBuilder(double.class)
+        mainCategory.option(Option.<Double>createBuilder()
                 .name(Component.translatable("settings.clientstorage.max_distance"))
                 .description(OptionDescription.of(Component.translatable("tooltip.clientstorage.max_distance")))
                 .binding(Math.sqrt(ServerGamePacketListenerImpl.MAX_INTERACTION_DISTANCE), () -> config.maxDist, value -> config.maxDist = value)

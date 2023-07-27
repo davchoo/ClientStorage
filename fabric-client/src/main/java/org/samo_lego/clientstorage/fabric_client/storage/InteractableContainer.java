@@ -24,8 +24,6 @@ public interface InteractableContainer extends Container {
         ((ICSPlayer) Minecraft.getInstance().player).cs_setLastInteractedContainer(this);
     }
 
-    boolean cs_isDelayed();
-
     default void cs_storeContents(AbstractContainerMenu containerMenu) {
         final NonNullList<ItemStack> items = containerMenu.getItems();
 
