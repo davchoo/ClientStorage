@@ -2,7 +2,6 @@ package org.samo_lego.clientstorage.fabric_client.mixin.screen;
 
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.*;
-import org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery;
 import org.samo_lego.clientstorage.fabric_client.inventory.RemoteInventory;
 import org.samo_lego.clientstorage.fabric_client.inventory.RemoteSlot;
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.ASlot;
@@ -33,7 +32,5 @@ public abstract class MCraftingMenu extends RecipeBookMenu<CraftingContainer> {
                 this.addSlot(new RemoteSlot(RemoteInventory.getInstance(), col + row * 9, col * 18 + 9, row * 18 - 23));
             }
         }
-
-        ContainerDiscovery.onCraftingScreenOpen();
     }
 }

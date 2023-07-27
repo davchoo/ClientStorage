@@ -57,15 +57,18 @@ public class ContainerDiscovery {
     public static BlockHitResult lastCraftingHit = null;
     public static int craftingPickupSlotId = -1;
 
-    private static long fakePacketsTimestamp = 0;
-    private static CompletableFuture<?> watchdog;
+    private static long lastInteractionTimestamp = 0;
+    private static CompletableFuture<?> watchdog = CompletableFuture.completedFuture(null);
 
     public static boolean fakePacketsActive() {
-        return (fakePacketsTimestamp + 5000) > System.currentTimeMillis();
+        return !watchdog.isDone() && (!INTERACTION_Q.isEmpty() || expectedInventory != null);
     }
 
     public static void resetFakePackets() {
-        fakePacketsTimestamp = 0;
+        INTERACTION_Q.clear();
+        PENDING_ACTIONS_Q.clear();
+        craftingPickupSlotId = -1;
+        expectedInventory = null;
     }
 
     public static InteractionResult onUseBlock(Player player, Level world, InteractionHand hand, BlockHitResult hitResult) {
@@ -235,7 +238,7 @@ public class ContainerDiscovery {
 
     private static void startWatchdog() {
         while (!INTERACTION_Q.isEmpty() || expectedInventory != null) {
-            long timeSinceLastPacket = System.currentTimeMillis() - fakePacketsTimestamp;
+            long timeSinceLastPacket = System.currentTimeMillis() - lastInteractionTimestamp;
             if (timeSinceLastPacket > 1500) {
                 ClientStorageFabric.tryLog("No response, skipping to next interaction", ChatFormatting.RED);
                 sendNextPacket();
@@ -252,7 +255,7 @@ public class ContainerDiscovery {
      * Send a packets from interaction queue.
      */
     public static void sendNextPacket() {
-        fakePacketsTimestamp = System.currentTimeMillis();
+        lastInteractionTimestamp = System.currentTimeMillis();
         expectedInventory = null;
 
         var player = Minecraft.getInstance().player;
@@ -293,9 +296,6 @@ public class ContainerDiscovery {
             }
         }
         ClientStorageFabric.tryLog("Finished sending packets", ChatFormatting.GREEN);
-        // No more fake packets
-        fakePacketsTimestamp -= 5000;
-
         reopenCraftingTable();
     }
 
@@ -321,9 +321,13 @@ public class ContainerDiscovery {
         var mc = Minecraft.getInstance();
         var player = mc.player;
         if (expectedInventory == null) {
-            if (containerMenu.getType() == MenuType.CRAFTING && craftingPickupSlotId != -1) {
-                mc.gameMode.handleInventoryMouseClick(containerMenu.containerId, craftingPickupSlotId, 0, ClickType.PICKUP, player);
-                craftingPickupSlotId = -1;
+            if (containerMenu.getType() == MenuType.CRAFTING) {
+                if (craftingPickupSlotId != -1) {
+                    mc.gameMode.handleInventoryMouseClick(containerMenu.containerId, craftingPickupSlotId, 0, ClickType.PICKUP, player);
+                    craftingPickupSlotId = -1;
+                }
+                resetFakePackets();
+                RemoteInventory.getInstance().sort();
             } else if (containerMenu != player.inventoryMenu && fakePacketsActive()) {
                 ClientStorageFabric.tryLog("Received unexpected inventory initialize", ChatFormatting.RED);
             }
@@ -348,13 +352,5 @@ public class ContainerDiscovery {
         }
         expectedInventory = null;
         sendNextPacket();
-    }
-
-    public static void onCraftingScreenOpen() {
-        resetFakePackets();
-        INTERACTION_Q.clear();
-        PENDING_ACTIONS_Q.clear();
-        expectedInventory = null;
-        RemoteInventory.getInstance().sort();
     }
 }
