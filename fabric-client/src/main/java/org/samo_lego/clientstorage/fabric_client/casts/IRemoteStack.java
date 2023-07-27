@@ -109,7 +109,7 @@ public interface IRemoteStack {
             // Place the item in the free slot in the container and count the amount of empty slots left
             boolean inserted = false;
             int spaceLeft = 0;
-            for (int containerSlot = 0; containerSlot < container.getContainerSize(); ++containerSlot) {
+            for (int containerSlot = container.cs_startSlot(); containerSlot < container.getContainerSize(); ++containerSlot) {
                 if (containerMenu.getSlot(containerSlot).getItem().isEmpty()) {
                     if (!inserted) {
                         inserted = true;

@@ -12,7 +12,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ClickType;
-import net.minecraft.world.inventory.MenuType;
+import net.minecraft.world.inventory.CraftingMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -321,7 +321,7 @@ public class ContainerDiscovery {
         var mc = Minecraft.getInstance();
         var player = mc.player;
         if (expectedInventory == null) {
-            if (containerMenu.getType() == MenuType.CRAFTING) {
+            if (containerMenu.getClass() == CraftingMenu.class) {
                 if (craftingPickupSlotId != -1) {
                     mc.gameMode.handleInventoryMouseClick(containerMenu.containerId, craftingPickupSlotId, 0, ClickType.PICKUP, player);
                     craftingPickupSlotId = -1;

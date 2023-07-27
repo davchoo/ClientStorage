@@ -31,7 +31,7 @@ public class ContainerUtil {
      * @param copyStacks whether to use {@link ItemStack#copy()} or not.
      */
     public static void copyContent(InteractableContainer from, InteractableContainer to, boolean copyStacks) {
-        for (int i = 0; i < from.getContainerSize() && i < to.getContainerSize(); ++i) {
+        for (int i = from.cs_startSlot(); i < from.getContainerSize() && i < to.getContainerSize(); ++i) {
             var stack = from.getItem(i);
             if (copyStacks) stack = stack.copy();
             to.setItem(i, stack);

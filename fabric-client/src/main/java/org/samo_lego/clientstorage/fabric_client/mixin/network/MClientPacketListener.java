@@ -1,15 +1,12 @@
 package org.samo_lego.clientstorage.fabric_client.mixin.network;
 
-import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientPacketListener;
 import net.minecraft.network.protocol.game.ClientboundCustomPayloadPacket;
+import net.minecraft.network.protocol.game.ClientboundHorseScreenOpenPacket;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
-import org.samo_lego.clientstorage.fabric_client.casts.ICSPlayer;
 import org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery;
 import org.samo_lego.clientstorage.fabric_client.network.PacketLimits;
-import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
-import org.spongepowered.asm.mixin.Shadow;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
@@ -19,6 +16,17 @@ import static net.minecraft.sounds.SoundSource.BLOCKS;
 
 @Mixin(ClientPacketListener.class)
 public class MClientPacketListener {
+
+    @Inject(method = "handleHorseScreenOpen",
+            at = @At(value = "INVOKE",
+                    target = "Lnet/minecraft/client/Minecraft;setScreen(Lnet/minecraft/client/gui/screens/Screen;)V"),
+            cancellable = true
+    )
+    private void mixinHorseScreenOpen(ClientboundHorseScreenOpenPacket clientboundHorseScreenOpenPacket, CallbackInfo ci) {
+        if (ContainerDiscovery.fakePacketsActive()) {
+            ci.cancel();
+        }
+    }
 
     /**
      * Disables incoming block sounds (e.g. barrel opening)

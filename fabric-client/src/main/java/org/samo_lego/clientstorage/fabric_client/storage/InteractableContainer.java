@@ -34,7 +34,7 @@ public interface InteractableContainer extends Container {
         }
 
         boolean hasItems = false;
-        for (int i = 0; i < getContainerSize(); ++i) {
+        for (int i = cs_startSlot(); i < getContainerSize(); ++i) {
             ItemStack stack = items.get(i);
             setItem(i, stack);
             if (stack.isEmpty()) {
@@ -54,6 +54,10 @@ public interface InteractableContainer extends Container {
         if (hasItems) {
             StorageCache.CACHED_INVENTORIES.add(this);
         }
+    }
+
+    default int cs_startSlot() {
+        return 0;
     }
 
     /**
