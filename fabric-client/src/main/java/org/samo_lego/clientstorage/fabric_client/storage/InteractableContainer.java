@@ -1,11 +1,15 @@
 package org.samo_lego.clientstorage.fabric_client.storage;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
+import net.minecraft.core.NonNullList;
 import net.minecraft.network.chat.Component;
-import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.phys.Vec3;
+import org.samo_lego.clientstorage.fabric_client.ClientStorageFabric;
 import org.samo_lego.clientstorage.fabric_client.casts.ICSPlayer;
 import org.samo_lego.clientstorage.fabric_client.event.ContainerDiscovery;
 import org.samo_lego.clientstorage.fabric_client.util.StorageCache;
@@ -22,30 +26,35 @@ public interface InteractableContainer extends Container {
 
     boolean cs_isDelayed();
 
-    default void cs_parseOpenPacket(ClientboundContainerSetContentPacket packet) {
-        final var stacks = packet.getItems();
-        // Writing container content
-        boolean added = false;
-        for (int i = 0; i < stacks.size() && i < this.getContainerSize(); ++i) {
-            var stack = stacks.get(i);
+    default void cs_storeContents(AbstractContainerMenu containerMenu) {
+        final NonNullList<ItemStack> items = containerMenu.getItems();
 
-            int count = stack.getCount();
+        int emptySlots = 0;
+        if (items.size() - 36 != getContainerSize()) {
+            ClientStorageFabric.tryLog("Mismatch inventory size. Got: " + (items.size() - 36) + ", world container: " + getContainerSize(), ChatFormatting.RED);
+            return;
+        }
 
-            if (ContainerDiscovery.fakePacketsActive()) {
+        boolean hasItems = false;
+        for (int i = 0; i < getContainerSize(); ++i) {
+            ItemStack stack = items.get(i);
+            setItem(i, stack);
+            if (stack.isEmpty()) {
+                ++emptySlots;
+            } else if (ContainerDiscovery.fakePacketsActive()) {
                 // Also add to remote inventory
-                if (count > 0) {
-                    // Add to crafting screen
-                    ContainerDiscovery.addRemoteItem(this, i, stacks.get(i));
-                    added = true;
-                } else {
-                    // This container has more space
-                    StorageCache.FREE_SPACE_CONTAINERS.compute(this, (key, value) -> value == null ? 1 : value + 1);
-                }
+                ContainerDiscovery.addRemoteItem(this, i, stack);
+                hasItems = true;
             }
-            if (added) {
-                StorageCache.CACHED_INVENTORIES.add(this);
-            }
-            this.setItem(i, stack);
+        }
+
+        if (emptySlots == 0) {
+            StorageCache.FREE_SPACE_CONTAINERS.remove(this);
+        } else {
+            StorageCache.FREE_SPACE_CONTAINERS.put(this, emptySlots);
+        }
+        if (hasItems) {
+            StorageCache.CACHED_INVENTORIES.add(this);
         }
     }
 

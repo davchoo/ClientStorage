@@ -1,34 +1,36 @@
 {
-  "required": true,
-  "minVersion": "0.8",
-  "package": "org.samo_lego.clientstorage.fabric_client.mixin",
-  "compatibilityLevel": "JAVA_17",
-  "client": [
-    "MItemStack",
-    "MPlayer_ICSPlayer",
-    "accessor.ACompoundContainer",
-    "accessor.ACreativeModeInventoryScreen",
-    "accessor.AEntity",
-    "accessor.ALevelRenderer",
-    "accessor.AMultiPlayerGamemode",
-    "accessor.AScreen",
-    "accessor.ASlot",
-    "network.MClientPacketListener",
-    "network.MServerboundContainerClosePacket",
-    "screen.MAbstractContainerScreen",
-    "screen.MCraftingMenu",
-    "screen.MCraftingScreen",
-    "screen.storage_memory.MAbstractContainerScreen",
-    "screen.storage_memory.MMinecraft",
-    "storage.MAbstractChestedHorse",
-    "storage.MBaseContainerBlockEntity",
-    "storage.MCompoundContainer",
-    "storage.MContainerEntity"
-  ],
-  "injectors": {
-    "defaultRequire": 1
-  },
-  "mixins": [
-    "screen.storage_memory.MServerboundContainerClickPacket"
-  ]
+    "required": true,
+    "minVersion": "0.8",
+    "package": "org.samo_lego.clientstorage.fabric_client.mixin",
+    "compatibilityLevel": "JAVA_17",
+    "client": [
+        "MItemStack",
+        "MPlayer_ICSPlayer",
+        "accessor.ACompoundContainer",
+        "accessor.ACreativeModeInventoryScreen",
+        "accessor.AEntity",
+        "accessor.ALevelRenderer",
+        "accessor.AMultiPlayerGamemode",
+        "accessor.AScreen",
+        "accessor.ASlot",
+        "network.MClientPacketListener",
+        "network.MServerboundContainerClosePacket",
+        "screen.MAbstractContainerMenu",
+        "screen.MAbstractContainerScreen",
+        "screen.MCraftingMenu",
+        "screen.MCraftingScreen",
+        "screen.MScreenConstructor",
+        "screen.storage_memory.MAbstractContainerScreen",
+        "screen.storage_memory.MMinecraft",
+        "storage.MAbstractChestedHorse",
+        "storage.MBaseContainerBlockEntity",
+        "storage.MCompoundContainer",
+        "storage.MContainerEntity"
+    ],
+    "injectors": {
+        "defaultRequire": 1
+    },
+    "mixins": [
+        "screen.storage_memory.MServerboundContainerClickPacket"
+    ]
 }

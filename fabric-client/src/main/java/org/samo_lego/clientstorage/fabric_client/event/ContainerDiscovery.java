@@ -3,7 +3,6 @@ package org.samo_lego.clientstorage.fabric_client.event;
 import net.minecraft.ChatFormatting;
 import net.minecraft.client.Minecraft;
 import net.minecraft.core.BlockPos;
-import net.minecraft.network.protocol.game.ClientboundContainerSetContentPacket;
 import net.minecraft.network.protocol.game.ServerboundContainerClosePacket;
 import net.minecraft.network.protocol.game.ServerboundUseItemOnPacket;
 import net.minecraft.server.level.ServerLevel;
@@ -11,6 +10,8 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Blocks;
@@ -23,7 +24,6 @@ import net.minecraft.world.phys.Vec3;
 import org.samo_lego.clientstorage.fabric_client.ClientStorageFabric;
 import org.samo_lego.clientstorage.fabric_client.casts.ICSPlayer;
 import org.samo_lego.clientstorage.fabric_client.casts.IRemoteStack;
-import org.samo_lego.clientstorage.fabric_client.config.FabricConfig;
 import org.samo_lego.clientstorage.fabric_client.inventory.RemoteInventory;
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.ACompoundContainer;
 import org.samo_lego.clientstorage.fabric_client.mixin.accessor.AMultiPlayerGamemode;
@@ -280,6 +280,9 @@ public class ContainerDiscovery {
             }
         }
         ClientStorageFabric.tryLog("Finished sending packets", ChatFormatting.GREEN);
+        // No more fake packets
+        fakePacketsTimestamp -= 5000;
+
         reopenCraftingTable();
     }
 
@@ -296,29 +299,33 @@ public class ContainerDiscovery {
         RemoteInventory.getInstance().addStack(IRemoteStack.fromStack(stack, source, slotId).copy());
     }
 
-    public static void onInventoryPacket(final ClientboundContainerSetContentPacket packet) {
+    public static void onInventoryInitialize(AbstractContainerMenu containerMenu) {
         if (expectedInventory == null) {
-            if (packet.getContainerId() != 0 && fakePacketsActive()) {
-                ClientStorageFabric.tryLog("Received unexpected inventory packet", ChatFormatting.RED);
+            if (containerMenu.getType() != null && fakePacketsActive()) {
+                ClientStorageFabric.tryLog("Received unexpected inventory initialize", ChatFormatting.RED);
             }
             return;
         }
 
-        var stacks = packet.getItems();
+        var stacks = containerMenu.getItems();
         if (expectedInventory.getContainerSize() + 36 != stacks.size()) {
             ClientStorageFabric.tryLog(String.format("Container size mismatch, expected %d [%s] but got %d.%n",
                             expectedInventory.getContainerSize(), expectedInventory.cs_info(), stacks.size() - 36),
                     ChatFormatting.RED);
+            return;
         }
 
-        ClientStorageFabric.tryLog(String.format("Received inventory packet for %s with: %s",
+        ClientStorageFabric.tryLog(String.format("Received inventory contents for %s with: %s",
                 expectedInventory.cs_info(),
                 stacks.stream().filter(s -> !s.isEmpty()).toList()), ChatFormatting.YELLOW);
 
-        expectedInventory.cs_parseOpenPacket(packet);
+        if (containerMenu.getType() != MenuType.CRAFTING) {
+            // No need to parse the crafting menu
+            expectedInventory.cs_storeContents(containerMenu);
+        }
         expectedInventory = null;
         // Close container packet
-        Minecraft.getInstance().player.connection.send(new ServerboundContainerClosePacket(packet.getContainerId()));
+        Minecraft.getInstance().player.connection.send(new ServerboundContainerClosePacket(containerMenu.containerId));
 
         sendNextPacket();
     }

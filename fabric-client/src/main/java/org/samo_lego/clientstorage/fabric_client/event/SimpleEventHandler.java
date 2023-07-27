@@ -134,34 +134,7 @@ public class SimpleEventHandler {
                 // Don't cache the fake items from ClientStorage
                 return;
             }
-
-            ClientStorageFabric.tryLog("Saving inventory to cache for " + inv.cs_info(), ChatFormatting.AQUA);
-            final NonNullList<ItemStack> items = player.containerMenu.getItems();
-
-            int emptySlots = 0;
-            if (items.size() - 36 != inv.getContainerSize()) {
-                ClientStorageFabric.tryLog("Mismatch inventory size. Got: " + (items.size() - 36) + ", world container: " + inv.getContainerSize(), ChatFormatting.RED);
-            }
-            for (int i = 0; i < inv.getContainerSize(); ++i) {
-                ItemStack stack = items.get(i);
-
-                inv.setItem(i, stack);
-
-                if (stack.isEmpty()) {
-                    ++emptySlots;
-                }
-            }
-
-
-            if (emptySlots == 0) {
-                StorageCache.FREE_SPACE_CONTAINERS.remove(inv);
-            } else {
-                StorageCache.FREE_SPACE_CONTAINERS.put(inv, emptySlots);
-            }
-
-            if (!inv.isEmpty()) {
-                StorageCache.CACHED_INVENTORIES.add(inv);
-            }
+            inv.cs_storeContents(player.containerMenu);
         });
 
         ((ICSPlayer) player).cs_setLastInteractedContainer(null);
